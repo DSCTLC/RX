@@ -19,7 +19,7 @@ class Explorer:
     def __init__(self, master: tk.Tk):
         """Initialize the Explorer class with a master tkinter window."""
         self.quit = None
-        self.split_scripts = None
+        self.refrsh_lists = None
 
         if not isinstance(master, tk.Tk):
             raise TypeError('master must be a tkinter window')
@@ -73,9 +73,9 @@ class Explorer:
                                               height=70, width=145)
         self.view_rx_button.grid(row=1, column=0, padx=10, pady=10, sticky='nw')
 
-        self.split_scripts_button=ctk.CTkButton(self.master, text='Split Scripts', command=self.split_scripts,
+        self.refrsh_lists_button=ctk.CTkButton(self.master, text='Refresh List', command=self.refrsh_lists,
                                                     height=25, width=145)
-        self.split_scripts_button.grid(row=2, column=0, padx=10, pady=10, sticky='nw')
+        self.refrsh_lists_button.grid(row=2, column=0, padx=10, pady=10, sticky='nw')
 
         self.rename_button=ctk.CTkButton(self.master, text='NOT a RX\nRename and Move',
                                              command=self.rename, height=25, width=145)
@@ -210,19 +210,6 @@ class Explorer:
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-        def update_file_list_json(self):
-            """Update the file list in the JSON file."""
-            file_list=[]
-
-            for filename in os.listdir(self.incoming_folder):
-                filepath=os.path.join(self.incoming_folder, filename)
-                size=os.path.getsize(filepath)
-                modified=os.path.getmtime(filepath)
-                file_list.append({'filename': filename, 'size': size, 'modified': modified})
-
-            with open('file_list.json', 'w') as f:
-                json.dump(file_list, f)
-
         # Add the current files in the incoming_folder
         for filename in os.listdir(self.incoming_folder):
             size=os.path.getsize(os.path.join(self.incoming_folder, filename))
@@ -235,52 +222,6 @@ class Explorer:
                 with Image.open('file.png') as img:
                     item_icon=ImageTk.PhotoImage(img)
             modified=os.path.getmtime(os.path.join(self.incoming_folder, filename))
-            item=self.tree.insert('', 'end', text=filename, image=item_icon, values=(size, filetype))
-            self.tree.item(item, image=item_icon)
-
-    def create_snapshot_json(self):
-        """Create a new JSON file containing a snapshot of the files in the directory."""
-        snapshot=[]
-        for filename in os.listdir(self.incoming_folder):
-            filepath=os.path.join(self.incoming_folder, filename)
-            if os.path.isfile(filepath):
-                snapshot.append(filename)
-        with open("snapshot.json", "w") as f:
-            json.dump(snapshot, f)
-
-    def split_scripts(self):
-        """Split multi-script files into separate files."""
-        # Take a snapshot of the files in the directory and update config.json
-        file_list=os.listdir(self.incoming_folder)
-        with open("config.json", "w") as f:
-            json.dump({"files": file_list}, f)
-
-        # Continue with the current functionality of the function
-        print('This is not a script\nSplitting scripts')
-
-    def update_file_list(self):
-        """Update the file list in the Treeview."""
-        # Clear the Treeview
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-
-        with open("variable.json", "r") as f:
-            data=json.load(f)
-
-        incoming_folder=data["incoming_folder"]
-
-        # Add the current files in the incoming_folder
-        for filename in os.listdir(incoming_folder):
-            size=os.path.getsize(os.path.join(incoming_folder, filename))
-            if os.path.isdir(os.path.join(incoming_folder, filename)):
-                filetype='Directory'
-                with Image.open('folder.png') as img:
-                    item_icon=ImageTk.PhotoImage(img)
-            else:
-                filetype='File'
-                with Image.open('file.png') as img:
-                    item_icon=ImageTk.PhotoImage(img)
-            modified=os.path.getmtime(os.path.join(incoming_folder, filename))
             item=self.tree.insert('', 'end', text=filename, image=item_icon, values=(size, filetype))
             self.tree.item(item, image=item_icon)
 
