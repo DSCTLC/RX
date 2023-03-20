@@ -332,24 +332,46 @@ class Explorer:
         # Enable the preview canvas after the preview has been updated
         self.preview_canvas.configure(state='normal')
 
-    def show_message_auto_close(title, message, duration):
-        def close_message():
-            messagebox.destroy()
-
-        messagebox=tk.Toplevel()
+    def show_message_auto_close(self, title, message, duration):
+        messagebox=tk.Toplevel(self.master)
         messagebox.title(title)
 
-        label=tk.Label(messagebox, text=message)
-        label.pack(padx=10, pady=10)
+        message_label=ttk.Label(messagebox, text=message, font=('Arial', 12))
+        message_label.pack(padx=20, pady=20)
 
-        messagebox.after(duration, close_message)
+        messagebox.attributes('-topmost', 1)
+
+        main_screen_width=self.master.winfo_screenwidth()
+        main_screen_height=self.master.winfo_screenheight()
+
+        message_box_width=messagebox.winfo_reqwidth()
+        message_box_height=messagebox.winfo_reqheight()
+
+        x_coordinate=(main_screen_width // 2) - (message_box_width // 2)
+        y_coordinate=(main_screen_height // 2) - (message_box_height // 2)
+
+        messagebox.geometry(f"+{x_coordinate}+{y_coordinate}")
+
+        messagebox.after(duration, messagebox.destroy)
+
+    def is_valid_filename(self, filename):
+        invalid_chars=['<', '>', ':', '"', '/', '\\', '|', '?', '*']
+        if any(char in filename for char in invalid_chars):
+            return False
+        return True
 
     def rename(self):
         def submit_rename():
             new_file_name=entry.get().strip()
 
             if not new_file_name:
-                show_message_auto_close("Error", "No new file name entered.", 2000)
+                self.show_message_auto_close("Error", "No new file name entered.", 2000)
+                return
+
+            if not self.is_valid_filename(new_file_name):
+                messagebox.showerror("Invalid Filename",
+                                     "The filename contains invalid characters. Please use a valid filename.",
+                                     parent=rename_popup)
                 return
 
             destination_path=os.path.join(destination_folder_2, new_file_name)
@@ -359,13 +381,18 @@ class Explorer:
                 new_file_name+=f"_{date_time_suffix}"
                 destination_path=os.path.join(destination_folder_2, new_file_name)
                 messagebox.showinfo("File name conflict",
-                                    f"File with the same name exists. Appending date and time to the file name: {new_file_name}")
+                                    f"File with the same name exists. Appending date and time to the file name: {new_file_name}",
+                                    parent=rename_popup)
 
             shutil.move(source_path, destination_path)
             rename_popup.destroy()
             self.refresh_lists()
 
-            show_message_auto_close("File moved", f'"{file_name}" moved to "{destination_folder_2}"', 2000)
+            # Show temporary message after renaming with the new file name
+            self.show_message_auto_close("File moved", f'"{new_file_name}" moved to "{destination_folder_2}"', 2000)
+
+        def cancel_rename():
+            rename_popup.destroy()
 
         with open("variable.json", "r") as file:
             config_data=json.load(file)
@@ -379,6 +406,7 @@ class Explorer:
         # Create a popup for renaming
         rename_popup=tk.Toplevel()
         rename_popup.title("Rename file")
+        rename_popup.attributes('-topmost', True)  # Keep the popup on top of the main window
 
         # Calculate the position to center the popup on the screen
         screen_width=rename_popup.winfo_screenwidth()
@@ -396,23 +424,36 @@ class Explorer:
         entry=tk.Entry(rename_popup)
         entry.pack(padx=10, pady=10)
 
-        submit_button=tk.Button(rename_popup, text="Submit", command=submit_rename)
-        submit_button.pack(pady=10)
+        button_frame=tk.Frame(rename_popup)
+        button_frame.pack(pady=10)
+
+        submit_button=tk.Button(button_frame, text="Submit", command=submit_rename)
+        submit_button.pack(side="left", padx=5)
+
+        cancel_button=tk.Button(button_frame, text="Cancel", command=cancel_rename)
+        cancel_button.pack(side="right", padx=5)
 
     def properties(self):
-        with open("variable.json", "r") as file:
-            config_data=json.load(file)
+        try:
+            with open("variable.json", "r") as file:
+                config_data=json.load(file)
 
-        destination_folder_2=config_data["destination_folder_2"]
+            destination_folder_2=config_data["destination_folder_2"]
 
-        selected_item=self.tree.selection()[0]
-        file_name=self.tree.item(selected_item, 'text')
-        source_path=os.path.join(self.incoming_folder, file_name)
-        destination_path=os.path.join(destination_folder_2, file_name)
+            selected_item=self.tree.selection()[0]
+            file_name=self.tree.item(selected_item, 'text')
+            source_path=os.path.join(self.incoming_folder, file_name)
+            destination_path=os.path.join(destination_folder_2, file_name)
 
-        shutil.move(source_path, destination_path)
-        self.refresh_lists()
-        
+            shutil.move(source_path, destination_path)
+            self.refresh_lists()
+
+            # Show temporary message after moving
+            self.show_message_auto_close("File moved", f'"{file_name}" moved to "{destination_folder_2}"', 2000)
+
+        except Exception as e:
+            print(f"Error moving file: {e}")
+
     def open_admin(self):
         """Open the admin script."""
         script_path=os.path.join(os.path.dirname(__file__), 'admin1.py')
