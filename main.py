@@ -4,13 +4,13 @@ import shutil
 import subprocess
 import threading
 import tkinter as tk
+from io import BytesIO
 from tkinter import ttk
+
 import customtkinter as ctk
 import pdf2image
 from PIL import Image, ImageTk
-from pdf2image import convert_from_path
 from PyPDF2 import PdfReader
-from io import BytesIO
 
 ctk.set_default_color_theme("dark-blue")
 
@@ -19,7 +19,7 @@ class Explorer:
     def __init__(self, master: tk.Tk):
         """Initialize the Explorer class with a master tkinter window."""
         self.quit = None
-        self.refrsh_lists = None
+        self.split_scripts = None
 
         if not isinstance(master, tk.Tk):
             raise TypeError('master must be a tkinter window')
@@ -73,9 +73,9 @@ class Explorer:
                                               height=70, width=145)
         self.view_rx_button.grid(row=1, column=0, padx=10, pady=10, sticky='nw')
 
-        self.refrsh_lists_button=ctk.CTkButton(self.master, text='Refresh List', command=self.refrsh_lists,
+        self.split_scripts_button=ctk.CTkButton(self.master, text='Split Scripts', command=self.split_scripts,
                                                     height=25, width=145)
-        self.refrsh_lists_button.grid(row=2, column=0, padx=10, pady=10, sticky='nw')
+        self.split_scripts_button.grid(row=2, column=0, padx=10, pady=10, sticky='nw')
 
         self.rename_button=ctk.CTkButton(self.master, text='NOT a RX\nRename and Move',
                                              command=self.rename, height=25, width=145)
@@ -85,7 +85,9 @@ class Explorer:
                                                  command=self.properties, height=25, width=145)
         self.properties_button.grid(row=4, column=0, padx=10, pady=10, sticky='nw')
 
-
+        self.refresh_lists_button = ctk.CTkButton(self.master, text='Refresh Lists', command=self.refresh_lists,
+                                                  height=25, width=145)
+        self.refresh_lists_button.grid(row=5, column=0, padx=10, pady=10, sticky='nw')
 
         self.admin_button=ctk.CTkButton(self.master, text='Admin', command=self.open_admin, height=25, width=60)
         self.admin_button.grid(row=6, column=0, padx=10)
@@ -252,6 +254,17 @@ class Explorer:
         self.is_dark_mode=not self.is_dark_mode
         self.set_theme()
 
+    def refresh_lists(self):
+        with open("config.json", "r") as file:
+            config_data=json.load(file)
+
+        self.incoming_folder=config_data["incoming_folder"]
+
+        self.tree.delete(*self.tree.get_children())  # Clear the treeview first
+        for item in os.listdir(self.incoming_folder):
+            self.tree.insert('', 'end', text=item,
+                             values=(os.path.getsize(os.path.join(self.incoming_folder, item)), "File"))
+
     def view_rx(self):
         """Open the selected file using a separate script."""
         item=self.tree.selection()[0]
@@ -286,7 +299,13 @@ class Explorer:
 
     def on_treeview_select(self, event):
         # Handle Treeview selection event
-        item=self.tree.selection()[0]
+        selected_items=self.tree.selection()
+
+        if not selected_items:
+            print("No item selected.")
+            return
+
+        item=selected_items[0]
         filename=self.tree.item(item, 'text')
         filepath=os.path.join(self.incoming_folder, filename)
 
@@ -316,15 +335,24 @@ class Explorer:
         filepath=os.path.join(self.incoming_folder, filename)
         new_filepath=os.path.join(os.path.expanduser('~'), 'Documents', filename)
         shutil.move(filepath, new_filepath)
+        self.refresh_lists()
 
     def properties(self):
         """Move the selected file to the Documents folder."""
         print('This is not a script\nMove to Documents folder')
-        item=self.tree.selection()[0]
+        selected_items=self.tree.selection()
+
+        if not selected_items:  # Check if there is a selected item
+            print("No item selected.")
+            return
+
+        item=selected_items[0]
         filename=self.tree.item(item, 'text')
         filepath=os.path.join(self.incoming_folder, filename)
         new_filepath=os.path.join(os.path.expanduser('~'), 'Documents', filename)
         shutil.move(filepath, new_filepath)
+
+        self.refresh_lists()
 
     def open_admin(self):
         """Open the admin script."""
