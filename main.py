@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import shutil
@@ -5,7 +6,7 @@ import subprocess
 import threading
 import tkinter as tk
 from io import BytesIO
-from tkinter import ttk
+from tkinter import ttk, messagebox
 
 import customtkinter as ctk
 import pdf2image
@@ -13,6 +14,10 @@ from PIL import Image, ImageTk
 from PyPDF2 import PdfReader
 
 ctk.set_default_color_theme("dark-blue")
+
+
+def show_message_auto_close(param, param1, param2):
+    pass
 
 
 class Explorer:
@@ -255,7 +260,7 @@ class Explorer:
         self.set_theme()
 
     def refresh_lists(self):
-        with open("config.json", "r") as file:
+        with open("variable.json", "r") as file:
             config_data=json.load(file)
 
         self.incoming_folder=config_data["incoming_folder"]
@@ -327,33 +332,87 @@ class Explorer:
         # Enable the preview canvas after the preview has been updated
         self.preview_canvas.configure(state='normal')
 
+    def show_message_auto_close(title, message, duration):
+        def close_message():
+            messagebox.destroy()
+
+        messagebox=tk.Toplevel()
+        messagebox.title(title)
+
+        label=tk.Label(messagebox, text=message)
+        label.pack(padx=10, pady=10)
+
+        messagebox.after(duration, close_message)
+
     def rename(self):
-        """Rename the selected file and move it to the Documents folder."""
-        print('This is not a script\nRename and Move to Documents folder')
-        item=self.tree.selection()[0]
-        filename=self.tree.item(item, 'text')
-        filepath=os.path.join(self.incoming_folder, filename)
-        new_filepath=os.path.join(os.path.expanduser('~'), 'Documents', filename)
-        shutil.move(filepath, new_filepath)
-        self.refresh_lists()
+        def submit_rename():
+            new_file_name=entry.get().strip()
+
+            if not new_file_name:
+                show_message_auto_close("Error", "No new file name entered.", 2000)
+                return
+
+            destination_path=os.path.join(destination_folder_2, new_file_name)
+
+            if os.path.exists(destination_path):
+                date_time_suffix=datetime.datetime.now().strftime("%y%m%d%H%M%S")
+                new_file_name+=f"_{date_time_suffix}"
+                destination_path=os.path.join(destination_folder_2, new_file_name)
+                messagebox.showinfo("File name conflict",
+                                    f"File with the same name exists. Appending date and time to the file name: {new_file_name}")
+
+            shutil.move(source_path, destination_path)
+            rename_popup.destroy()
+            self.refresh_lists()
+
+            show_message_auto_close("File moved", f'"{file_name}" moved to "{destination_folder_2}"', 2000)
+
+        with open("variable.json", "r") as file:
+            config_data=json.load(file)
+
+        destination_folder_2=config_data["destination_folder_2"]
+
+        selected_item=self.tree.selection()[0]
+        file_name=self.tree.item(selected_item, 'text')
+        source_path=os.path.join(self.incoming_folder, file_name)
+
+        # Create a popup for renaming
+        rename_popup=tk.Toplevel()
+        rename_popup.title("Rename file")
+
+        # Calculate the position to center the popup on the screen
+        screen_width=rename_popup.winfo_screenwidth()
+        screen_height=rename_popup.winfo_screenheight()
+        popup_width=300
+        popup_height=120
+
+        x_position=(screen_width // 2) - (popup_width // 2)
+        y_position=(screen_height // 2) - (popup_height // 2)
+        rename_popup.geometry(f"{popup_width}x{popup_height}+{x_position}+{y_position}")
+
+        label=tk.Label(rename_popup, text="Enter new file name:")
+        label.pack(padx=10, pady=10)
+
+        entry=tk.Entry(rename_popup)
+        entry.pack(padx=10, pady=10)
+
+        submit_button=tk.Button(rename_popup, text="Submit", command=submit_rename)
+        submit_button.pack(pady=10)
 
     def properties(self):
-        """Move the selected file to the Documents folder."""
-        print('This is not a script\nMove to Documents folder')
-        selected_items=self.tree.selection()
+        with open("variable.json", "r") as file:
+            config_data=json.load(file)
 
-        if not selected_items:  # Check if there is a selected item
-            print("No item selected.")
-            return
+        destination_folder_2=config_data["destination_folder_2"]
 
-        item=selected_items[0]
-        filename=self.tree.item(item, 'text')
-        filepath=os.path.join(self.incoming_folder, filename)
-        new_filepath=os.path.join(os.path.expanduser('~'), 'Documents', filename)
-        shutil.move(filepath, new_filepath)
+        selected_item=self.tree.selection()[0]
+        file_name=self.tree.item(selected_item, 'text')
+        source_path=os.path.join(self.incoming_folder, file_name)
+        destination_path=os.path.join(destination_folder_2, file_name)
 
+        shutil.move(source_path, destination_path)
         self.refresh_lists()
-
+        
     def open_admin(self):
         """Open the admin script."""
         script_path=os.path.join(os.path.dirname(__file__), 'admin1.py')
