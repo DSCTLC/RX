@@ -7,7 +7,6 @@ import threading
 import tkinter as tk
 from io import BytesIO
 from tkinter import ttk, messagebox
-from test import PDFViewer
 
 import customtkinter as ctk
 import pdf2image
@@ -34,14 +33,10 @@ class Explorer:
                 self.tree.insert('', 'end', text=file)
 
         # Select the first item in the tree after populating it
-        first_item = self.tree.get_children()[0]
+        first_item=self.tree.get_children()[0]
         self.tree.selection_set(first_item)
         self.tree.focus_set()
         self.tree.focus(first_item)
-
-    def refresh_file_list(self):
-        self.tree.delete(*self.tree.get_children())
-        self.populate_treeview()
 
     def __init__(self, master: tk.Tk):
         """Initialize the Explorer class with a master tkinter window."""
@@ -65,22 +60,11 @@ class Explorer:
         if self.tree.get_children():
             self.tree.selection_set(self.tree.get_children()[0])
 
-    def open_pdf(self, event):
-        item=self.tree.selection()[0]
-        filepath=self.tree.item(item, "text")
-        filepath=os.path.join(self.get_incoming_folder(), filepath)
-
-        if os.path.isfile(filepath):
-            if filepath.lower().endswith('.pdf'):
-                window=tk.Toplevel(self.root)
-                window.title(filepath)
-                PDFViewer(window, filepath, refresh_callback=self.refresh_file_list)
-
     def setup_ui(self):
         """Create and configure UI elements for the application."""
         # Create and place UI elements
         self.theme_button=ctk.CTkButton(self.master, text='Themes', command=self.switch_theme, height=25,
-                                            width=60)
+                                        width=60)
         self.theme_button.grid(row=6, column=0, padx=10, pady=10, sticky='ne')
 
         self.master.geometry("800x600")
@@ -111,25 +95,24 @@ class Explorer:
         self.pages_label.grid(row=1, column=2, padx=20, pady=15, sticky="nw")
 
         self.view_rx_button=ctk.CTkButton(self.master, text='   View RX   ', command=self.view_rx, state='disabled',
-                                              height=70, width=145)
+                                          height=70, width=145)
         self.view_rx_button.grid(row=1, column=0, padx=10, pady=10, sticky='nw')
 
         self.split_scripts_button=ctk.CTkButton(self.master, text='Split Scripts', command=self.split_scripts,
-                                                    height=25, width=145)
+                                                height=25, width=145)
         self.split_scripts_button.grid(row=2, column=0, padx=10, pady=10, sticky='nw')
 
         self.rename_button=ctk.CTkButton(self.master, text='NOT a RX\nRename and Move',
-                                             command=self.rename, height=25, width=145)
+                                         command=self.rename, height=25, width=145)
         self.rename_button.grid(row=3, column=0, padx=10, pady=10, sticky='nw')
 
         self.properties_button=ctk.CTkButton(self.master, text='NOT a RX\n Move',
-                                                 command=self.properties, height=25, width=145)
+                                             command=self.properties, height=25, width=145)
         self.properties_button.grid(row=4, column=0, padx=10, pady=10, sticky='nw')
 
-        self.refresh_lists_button = ctk.CTkButton(self.master, text='Refresh Lists', command=self.refresh_lists,
-                                                  height=25, width=145)
+        self.refresh_lists_button=ctk.CTkButton(self.master, text='Refresh Lists', command=self.refresh_lists,
+                                                height=25, width=145)
         self.refresh_lists_button.grid(row=5, column=0, padx=10, pady=10, sticky='nw')
-
 
         self.admin_button=ctk.CTkButton(self.master, text='Admin', command=self.open_admin, height=25, width=60)
         self.admin_button.grid(row=6, column=0, padx=10, pady=10, sticky='nw')
@@ -276,15 +259,15 @@ class Explorer:
         if img_source is not None:
             try:
                 if isinstance(img_source, str):
-                    img = Image.open(img_source)
+                    img=Image.open(img_source)
                 else:
-                    img = img_source
+                    img=img_source
 
                 img.thumbnail((400, 400), Image.ANTIALIAS)
-                imgtk = ImageTk.PhotoImage(img)
+                imgtk=ImageTk.PhotoImage(img)
 
                 self.preview_canvas.create_image(0, 0, image=imgtk, anchor="nw")
-                self.preview_canvas.image = imgtk
+                self.preview_canvas.image=imgtk
             except Exception as e:
                 print("Error updating image preview:", e)
                 self.preview_canvas.delete("all")
@@ -545,8 +528,9 @@ class Explorer:
         # Call admin script
         subprocess.call(["python", script_path])
 
+
 if __name__ == '__main__':
-    root = tk.Tk()
-    explorer = Explorer(root)
+    root=tk.Tk()
+    explorer=Explorer(root)
     root.protocol('WM_DELETE_WINDOW', explorer.quit)
     root.mainloop()
