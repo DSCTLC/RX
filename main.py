@@ -7,6 +7,7 @@ import threading
 import tkinter as tk
 from io import BytesIO
 from tkinter import ttk, messagebox
+from test import PDFViewer
 
 import customtkinter as ctk
 import pdf2image
@@ -21,24 +22,59 @@ def show_message_auto_close(param, param1, param2):
 
 
 class Explorer:
+
+    def populate_treeview(self):
+        # Clear the existing tree
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+        # Populate the treeview
+        for file in os.listdir(self.incoming_folder):
+            if os.path.isfile(os.path.join(self.incoming_folder, file)):
+                self.tree.insert('', 'end', text=file)
+
+        # Select the first item in the tree after populating it
+        first_item = self.tree.get_children()[0]
+        self.tree.selection_set(first_item)
+        self.tree.focus_set()
+        self.tree.focus(first_item)
+
+    def refresh_file_list(self):
+        self.tree.delete(*self.tree.get_children())
+        self.populate_treeview()
+
     def __init__(self, master: tk.Tk):
         """Initialize the Explorer class with a master tkinter window."""
-        self.quit = None
-        self.split_scripts = None
+        self.quit=None
+        self.split_scripts=None
 
         if not isinstance(master, tk.Tk):
             raise TypeError('master must be a tkinter window')
 
-        self.master = master
+        self.master=master
         master.title('Explorer')
 
         with open("variable.json", "r") as f:
-            data = json.load(f)
+            data=json.load(f)
 
-        self.incoming_folder = data["incoming_folder"]
-        self.is_dark_mode = True
+        self.incoming_folder=data["incoming_folder"]
+        self.is_dark_mode=True
 
         self.setup_ui()
+        self.refresh_lists()
+        if self.tree.get_children():
+            self.tree.selection_set(self.tree.get_children()[0])
+
+    def open_pdf(self, event):
+        item=self.tree.selection()[0]
+        filepath=self.tree.item(item, "text")
+        filepath=os.path.join(self.get_incoming_folder(), filepath)
+
+        if os.path.isfile(filepath):
+            if filepath.lower().endswith('.pdf'):
+                window=tk.Toplevel(self.root)
+                window.title(filepath)
+                PDFViewer(window, filepath, refresh_callback=self.refresh_file_list)
 
     def setup_ui(self):
         """Create and configure UI elements for the application."""
@@ -94,8 +130,9 @@ class Explorer:
                                                   height=25, width=145)
         self.refresh_lists_button.grid(row=5, column=0, padx=10, pady=10, sticky='nw')
 
+
         self.admin_button=ctk.CTkButton(self.master, text='Admin', command=self.open_admin, height=25, width=60)
-        self.admin_button.grid(row=6, column=0, padx=10)
+        self.admin_button.grid(row=6, column=0, padx=10, pady=10, sticky='nw')
 
         self.tree.bind('<<TreeviewSelect>>', self.on_treeview_select)
         self.tree.bind('<Double-Button-1>', self.on_double_click)
@@ -259,16 +296,25 @@ class Explorer:
         self.is_dark_mode=not self.is_dark_mode
         self.set_theme()
 
-    def refresh_lists(self):
+    def refresh_lists(self, next_item=None):
         with open("variable.json", "r") as file:
             config_data=json.load(file)
 
         self.incoming_folder=config_data["incoming_folder"]
 
-        self.tree.delete(*self.tree.get_children())  # Clear the treeview first
-        for item in os.listdir(self.incoming_folder):
-            self.tree.insert('', 'end', text=item,
-                             values=(os.path.getsize(os.path.join(self.incoming_folder, item)), "File"))
+        self.populate_treeview()
+
+        if self.tree.get_children():  # Check if there are items in the treeview
+            # Select the next available item after refreshing the list
+            if next_item:
+                self.tree.selection_set(next_item)
+                self.tree.focus_set()
+                self.tree.focus(next_item)
+            else:  # Select the first item if there's no next_item
+                first_item=self.tree.get_children()[0]
+                self.tree.selection_set(first_item)
+                self.tree.focus_set()
+                self.tree.focus(first_item)
 
     def view_rx(self):
         """Open the selected file using a separate script."""
@@ -384,9 +430,11 @@ class Explorer:
                                     f"File with the same name exists. Appending date and time to the file name: {new_file_name}",
                                     parent=rename_popup)
 
+            next_item=self.tree.next(selected_item)
+
             shutil.move(source_path, destination_path)
             rename_popup.destroy()
-            self.refresh_lists()
+            self.refresh_lists(next_item)
 
             # Show temporary message after renaming with the new file name
             self.show_message_auto_close("File moved", f'"{new_file_name}" moved to "{destination_folder_2}"', 2000)
@@ -434,25 +482,61 @@ class Explorer:
         cancel_button.pack(side="right", padx=5)
 
     def properties(self):
-        try:
-            with open("variable.json", "r") as file:
-                config_data=json.load(file)
-
-            destination_folder_2=config_data["destination_folder_2"]
-
-            selected_item=self.tree.selection()[0]
-            file_name=self.tree.item(selected_item, 'text')
-            source_path=os.path.join(self.incoming_folder, file_name)
+        def submit_move():
             destination_path=os.path.join(destination_folder_2, file_name)
 
+            if os.path.exists(destination_path):
+                messagebox.showerror("File name conflict",
+                                     f"File with the same name exists in \"{destination_folder_2}\". Please rename the file before moving.",
+                                     parent=properties_popup)
+                return
+
+            next_item=self.tree.next(selected_item)
             shutil.move(source_path, destination_path)
+            properties_popup.destroy()
             self.refresh_lists()
 
-            # Show temporary message after moving
+            # Show temporary message after moving the file
             self.show_message_auto_close("File moved", f'"{file_name}" moved to "{destination_folder_2}"', 2000)
 
-        except Exception as e:
-            print(f"Error moving file: {e}")
+        def cancel_move():
+            properties_popup.destroy()
+
+        with open("variable.json", "r") as file:
+            config_data=json.load(file)
+
+        destination_folder_2=config_data["destination_folder_2"]
+
+        selected_item=self.tree.selection()[0]
+        file_name=self.tree.item(selected_item, 'text')
+        source_path=os.path.join(self.incoming_folder, file_name)
+
+        # Create a popup for the move confirmation
+        properties_popup=tk.Toplevel()
+        properties_popup.title("Move file")
+        properties_popup.attributes('-topmost', True)  # Keep the popup on top of the main window
+
+        # Calculate the position to center the popup on the screen
+        screen_width=properties_popup.winfo_screenwidth()
+        screen_height=properties_popup.winfo_screenheight()
+        popup_width=350
+        popup_height=120
+
+        x_position=(screen_width // 2) - (popup_width // 2)
+        y_position=(screen_height // 2) - (popup_height // 2)
+        properties_popup.geometry(f"{popup_width}x{popup_height}+{x_position}+{y_position}")
+
+        label=tk.Label(properties_popup, text=f"Move \"{file_name}\" to \"{destination_folder_2}\"?")
+        label.pack(padx=10, pady=10)
+
+        button_frame=tk.Frame(properties_popup)
+        button_frame.pack(pady=10)
+
+        submit_button=tk.Button(button_frame, text="Move", command=submit_move)
+        submit_button.pack(side="left", padx=5)
+
+        cancel_button=tk.Button(button_frame, text="Cancel", command=cancel_move)
+        cancel_button.pack(side="right", padx=5)
 
     def open_admin(self):
         """Open the admin script."""
