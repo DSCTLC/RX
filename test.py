@@ -134,6 +134,7 @@ class PDFViewer:
         next_button = tk.Button(nav_frame, text="Next", command=self.next_page)
         next_button.pack(side=tk.RIGHT, padx=5)
 
+
     def split_document(self):
         if len(self.document) == 1:
             messagebox.showinfo("Split Error", "Only one page, why split?")
