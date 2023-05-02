@@ -7,8 +7,8 @@ import threading
 import tkinter as tk
 from io import BytesIO
 from tkinter import ttk, messagebox
-from test import PDFViewer
-
+import PyPDF2
+import fitz
 import customtkinter as ctk
 import pdf2image
 from PIL import Image, ImageTk
@@ -34,19 +34,15 @@ class Explorer:
                 self.tree.insert('', 'end', text=file)
 
         # Select the first item in the tree after populating it
-        first_item = self.tree.get_children()[0]
-        self.tree.selection_set(first_item)
-        self.tree.focus_set()
-        self.tree.focus(first_item)
-
-    def refresh_file_list(self):
-        self.tree.delete(*self.tree.get_children())
-        self.populate_treeview()
+        if self.tree.get_children():  # Add this condition
+            first_item=self.tree.get_children()[0]
+            self.tree.selection_set(first_item)
+            self.tree.focus_set()
+            self.tree.focus(first_item)
 
     def __init__(self, master: tk.Tk):
         """Initialize the Explorer class with a master tkinter window."""
         self.quit=None
-        self.split_scripts=None
 
         if not isinstance(master, tk.Tk):
             raise TypeError('master must be a tkinter window')
@@ -65,79 +61,106 @@ class Explorer:
         if self.tree.get_children():
             self.tree.selection_set(self.tree.get_children()[0])
 
-    def open_pdf(self, event):
-        item=self.tree.selection()[0]
-        filepath=self.tree.item(item, "text")
-        filepath=os.path.join(self.get_incoming_folder(), filepath)
+        self.check_update_flag()
 
-        if os.path.isfile(filepath):
-            if filepath.lower().endswith('.pdf'):
-                window=tk.Toplevel(self.root)
-                window.title(filepath)
-                PDFViewer(window, filepath, refresh_callback=self.refresh_file_list)
+    def get_treeview_bg_color(self):
+        style=ttk.Style()
+        bg_color=style.lookup("TCanvas", "background")
+        return bg_color
 
     def setup_ui(self):
         """Create and configure UI elements for the application."""
         # Create and place UI elements
-        self.theme_button=ctk.CTkButton(self.master, text='Themes', command=self.switch_theme, height=25,
-                                            width=60)
-        self.theme_button.grid(row=6, column=0, padx=10, pady=10, sticky='ne')
+        # ... (rest of the code remains the same) ...
 
-        self.master.geometry("800x600")
+        self.master.geometry("1250x850")
 
         style=ttk.Style()
         style.theme_use("clam")
 
-        self.tree=ttk.Treeview(self.master)
+        self.tree=ttk.Treeview(self.master, height=15)
         self.tree.grid(row=1, column=1, padx=15, pady=15, sticky='nsew')
+        self.tree.column("#0", width=300, anchor='w')
 
-        self.master.grid_columnconfigure(1, weight=1)
-        self.master.grid_rowconfigure(1, weight=1)
+        treeview_bg_color=self.get_treeview_bg_color()
 
-        # Create a new frame for the preview and pages_label
-        self.preview_frame=ttk.Frame(self.master, width=400, height=400)
+        main_bg_color=self.master.cget('bg')
 
-        self.preview_frame.grid(row=1, column=2, padx=15, pady=15, sticky='n')
+        style=ttk.Style()
+        default_bg_color=style.lookup('TFrame', 'background')
+        self.buttons_frame=tk.Frame(self.master, bg=main_bg_color)
 
-        self.preview_canvas=tk.Canvas(self.preview_frame, width=350, height=400)
-        self.preview_canvas.grid(row=0, column=0, padx=5, pady=5, sticky='nsew')
+        self.buttons_frame.config(bg='darkgray')
+        style=ttk.Style()
+        style.configure('Custom.TFrame', background='darkgray')
+        self.buttons_frame=ttk.Frame(self.master, style='Custom.TFrame')
 
-        # Add this line of code after creating the preview_canvas
-        self.pages_label=ttk.Label(self.preview_frame, text="")
-        self.pages_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        self.buttons_frame.grid(row=1, column=2, sticky='ew')
 
-        # Add this line of code after creating the preview_canvas
-        self.pages_label=ttk.Label(self.master, text="Pages:")
-        self.pages_label.grid(row=1, column=2, padx=20, pady=15, sticky="nw")
+        # Create an RX number label and entry widget
+        rx_label=tk.Label(self.buttons_frame, text="Enter RX number:", font=("TkDefaultFont", 16))
+        rx_label.grid(row=0, column=0, padx=10, pady=5, sticky='w')
+        rx_entry=tk.Entry(self.buttons_frame, font=("TkDefaultFont", 16))
+        rx_entry.grid(row=1, column=0, padx=10, pady=5, sticky='w')
 
-        self.view_rx_button=ctk.CTkButton(self.master, text='   View RX   ', command=self.view_rx, state='disabled',
-                                              height=70, width=145)
-        self.view_rx_button.grid(row=1, column=0, padx=10, pady=10, sticky='nw')
+        # Create a button in rx_frame
+        button=tk.Button(self.buttons_frame, text="Submit",
+                         command=lambda: self.rename_and_move_with_rx_number(rx_entry.get(), rx_entry))
+        button.grid(row=2, column=0, padx=10, pady=5, sticky='w')
 
-        self.split_scripts_button=ctk.CTkButton(self.master, text='Split Scripts', command=self.split_scripts,
-                                                    height=25, width=145)
-        self.split_scripts_button.grid(row=2, column=0, padx=10, pady=10, sticky='nw')
+        self.view_rx_button=ctk.CTkButton(self.buttons_frame, text='   View RX   ', command=self.view_rx,
+                                          state='disabled', height=70, width=145)
+        self.view_rx_button.grid(row=3, column=0, padx=10, pady=10, sticky='w')
 
-        self.rename_button=ctk.CTkButton(self.master, text='NOT a RX\nRename and Move',
-                                             command=self.rename, height=25, width=145)
-        self.rename_button.grid(row=3, column=0, padx=10, pady=10, sticky='nw')
+        self.split_scripts_button=ctk.CTkButton(self.buttons_frame, text='Split Scripts', command=self.split_scripts,
+                                                height=50, width=145)
+        self.split_scripts_button.grid(row=4, column=0, padx=10, pady=10, sticky='w')
 
-        self.properties_button=ctk.CTkButton(self.master, text='NOT a RX\n Move',
-                                                 command=self.properties, height=25, width=145)
-        self.properties_button.grid(row=4, column=0, padx=10, pady=10, sticky='nw')
+        self.rename_button=ctk.CTkButton(self.buttons_frame, text='NOT a RX\nRename and Move',
+                                         command=self.rename, height=50, width=145)
+        self.rename_button.grid(row=5, column=0, padx=10, pady=10, sticky='w')
 
-        self.refresh_lists_button = ctk.CTkButton(self.master, text='Refresh Lists', command=self.refresh_lists,
-                                                  height=25, width=145)
-        self.refresh_lists_button.grid(row=5, column=0, padx=10, pady=10, sticky='nw')
+        self.properties_button=ctk.CTkButton(self.buttons_frame, text='NOT a RX\n Move',
+                                             command=self.properties, height=50, width=145)
+        self.properties_button.grid(row=6, column=0, padx=10, pady=10, sticky='w')
 
+        self.refresh_lists_button=ctk.CTkButton(self.buttons_frame, text='Refresh Lists', command=self.refresh_lists,
+                                                height=50, width=145)
+        self.refresh_lists_button.grid(row=7, column=0, padx=10, pady=10, sticky='w')
 
-        self.admin_button=ctk.CTkButton(self.master, text='Admin', command=self.open_admin, height=25, width=60)
-        self.admin_button.grid(row=6, column=0, padx=10, pady=10, sticky='nw')
+        self.theme_button=ctk.CTkButton(self.master, text='Themes', command=self.switch_theme, height=25,
+                                        width=60)
+        self.theme_button.grid(row=8, column=0, padx=10, pady=40, sticky='nw')
 
         self.tree.bind('<<TreeviewSelect>>', self.on_treeview_select)
         self.tree.bind('<Double-Button-1>', self.on_double_click)
 
         self.open_files={}  # Initialize as a dictionary
+
+        # Call update_file_list to populate the Treeview
+        self.update_file_list()
+
+        # Set initial theme
+        self.set_theme()
+
+        # Add the preview back in
+        self.preview_frame = ttk.Frame(self.master, width=600, height=800)
+        self.preview_frame.grid(row=1, column=3, padx=15, pady=15, sticky='n')
+
+        self.preview_canvas = tk.Canvas(self.preview_frame, width=600, height=800)
+        self.preview_canvas.grid(row=0, column=0, padx=5, pady=5, sticky='nsew')
+
+        self.pages_label = ttk.Label(self.preview_frame, text="")
+        self.pages_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
+
+        self.pages_label = ttk.Label(self.master, text="Pages:")
+        self.pages_label.grid(row=1, column=3, padx=20, pady=15, sticky="nw")
+
+        self.admin_button = ctk.CTkButton(self.master, text='Admin', command=self.open_admin, height=25, width=60)
+        self.admin_button.grid(row=6, column=0, padx=10, pady=10, sticky='nw')
+
+
+        self.open_files = {}  # Initialize as a dictionary
 
         # Call update_file_list to populate the Treeview
         self.update_file_list()
@@ -152,7 +175,7 @@ class Explorer:
             fg_color="white"
             select_color="darkblue"
             treeview_bg_color="darkgray"
-            treeview_fg_color="white"
+            treeview_fg_color="blue"
         else:
             bg_color="white"
             fg_color="black"
@@ -185,6 +208,9 @@ class Explorer:
                   background=[("selected", select_color)],
                   foreground=[("selected", treeview_fg_color)])
 
+        # Comment out or remove the following line related to the center_frame
+        # self.center_frame.configure(bg=center_frame_bg_color)
+
     def on_select(self, event):
         """Handle selection events in the Treeview."""
         item=self.tree.selection()[0]
@@ -213,6 +239,7 @@ class Explorer:
 
         # Enable the preview canvas after the preview has been updated
         self.preview_canvas.configure(state='normal')
+
 
     def update_preview(self, filepath):
         """Update the preview of the selected file."""
@@ -276,15 +303,15 @@ class Explorer:
         if img_source is not None:
             try:
                 if isinstance(img_source, str):
-                    img = Image.open(img_source)
+                    img=Image.open(img_source)
                 else:
-                    img = img_source
+                    img=img_source
 
-                img.thumbnail((400, 400), Image.ANTIALIAS)
-                imgtk = ImageTk.PhotoImage(img)
+                img.thumbnail((800, 800), Image.ANTIALIAS)
+                imgtk=ImageTk.PhotoImage(img)
 
                 self.preview_canvas.create_image(0, 0, image=imgtk, anchor="nw")
-                self.preview_canvas.image = imgtk
+                self.preview_canvas.image=imgtk
             except Exception as e:
                 print("Error updating image preview:", e)
                 self.preview_canvas.delete("all")
@@ -315,6 +342,63 @@ class Explorer:
                 self.tree.selection_set(first_item)
                 self.tree.focus_set()
                 self.tree.focus(first_item)
+
+    def check_update_flag(self):
+        with open("shared_state.json", "r") as file:
+            shared_state = json.load(file)
+
+        if shared_state["update_file_list_flag"]:
+            self.refresh_lists()
+
+            # Set the flag to False after refreshing the list
+            shared_state["update_file_list_flag"] = False
+            with open("shared_state.json", "w") as file:
+                json.dump(shared_state, file)
+
+        # Schedule the next check after 1000 milliseconds (1 second)
+        self.master.after(1000, self.check_update_flag)
+
+    def split_scripts(self):
+        selected_item=self.tree.selection()[0]
+        file_name=self.tree.item(selected_item, 'text')
+        source_path=os.path.join(self.incoming_folder, file_name)
+
+        with open("variable.json", "r") as file:
+            config_data=json.load(file)
+
+        destination_folder_2=config_data["destination_folder_2"]
+
+        # Check if the selected file is a PDF
+        if not file_name.lower().endswith(".pdf"):
+            self.show_message_auto_close("Error", "Selected file is not a PDF.", 2000)
+            return
+
+        # Read the PDF file
+        with open(source_path, "rb") as file:
+            pdf_reader=PyPDF2.PdfReader(file)
+
+            # Check if the PDF has only one page
+            if len(pdf_reader.pages) == 1:
+                self.show_message_auto_close("Info", "Only one page, no need to split.", 2000)
+                return
+
+            # Split the PDF file and save the individual pages
+            for page_num in range(len(pdf_reader.pages)):
+                pdf_writer=PyPDF2.PdfWriter()
+                pdf_writer.add_page(pdf_reader.pages[page_num])
+
+                split_file_name=f"{os.path.splitext(file_name)[0]}_page{page_num + 1}.pdf"
+                split_file_path=os.path.join(self.incoming_folder, split_file_name)
+
+                with open(split_file_path, "wb") as output_file:
+                    pdf_writer.write(output_file)
+
+        # Move the original PDF to the destination folder 2
+        destination_path=os.path.join(destination_folder_2, file_name)
+        shutil.move(source_path, destination_path)
+
+        # Refresh the list
+        self.refresh_lists()
 
     def view_rx(self):
         """Open the selected file using a separate script."""
@@ -545,8 +629,9 @@ class Explorer:
         # Call admin script
         subprocess.call(["python", script_path])
 
+
 if __name__ == '__main__':
-    root = tk.Tk()
-    explorer = Explorer(root)
+    root=tk.Tk()
+    explorer=Explorer(root)
     root.protocol('WM_DELETE_WINDOW', explorer.quit)
     root.mainloop()
