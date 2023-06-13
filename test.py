@@ -188,14 +188,6 @@ class PDFViewer:
     def on_leave(self, button):
         button['background'] = 'lightblue'
 
-    def update_shared_state_file(self):
-        with open("shared_state.json", "r") as file:
-            shared_state=json.load(file)
-
-        shared_state["update_file_list_flag"]=False
-
-        with open("shared_state.json", "w") as file:
-            json.dump(shared_state, file)
 
     def update_shared_state_file(self):
         with open("shared_state.json", "r") as file:
