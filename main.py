@@ -9,12 +9,10 @@ from io import BytesIO
 from tkinter import ttk, messagebox
 import PyPDF2
 import fitz
-import customtkinter as ctk
 import pdf2image
 from PIL import Image, ImageTk
+import sys
 from PyPDF2 import PdfReader
-
-ctk.set_default_color_theme("dark-blue")
 
 
 def show_message_auto_close(param, param1, param2):
@@ -69,10 +67,6 @@ class Explorer:
         return bg_color
 
     def setup_ui(self):
-        """Create and configure UI elements for the application."""
-        # Create and place UI elements
-        # ... (rest of the code remains the same) ...
-
         self.master.geometry("1250x850")
 
         style=ttk.Style()
@@ -97,51 +91,72 @@ class Explorer:
 
         self.buttons_frame.grid(row=1, column=2, sticky='ew')
 
+        self.search_rx_button=tk.Button(self.buttons_frame, text="Search RX", command=self.search_rx, height=3,
+                                        width=15, bg="lightblue",
+                                        fg="black", relief="raised", font=('Arial', 12))
+        self.search_rx_button.grid(row=0, column=0, padx=10, pady=90, sticky='n')
+        self.search_rx_button.bind('<Enter>', lambda event: self.on_enter(self.search_rx_button))
+        self.search_rx_button.bind('<Leave>', lambda event: self.on_leave(self.search_rx_button))
+
         # Create an RX number label and entry widget
         rx_label=tk.Label(self.buttons_frame, text="Enter RX number:", font=("TkDefaultFont", 16))
-        rx_label.grid(row=0, column=0, padx=10, pady=5, sticky='w')
+        rx_label.grid(row=1, column=0, padx=10, pady=5, sticky='n')
         rx_entry=tk.Entry(self.buttons_frame, font=("TkDefaultFont", 16))
-        rx_entry.grid(row=1, column=0, padx=10, pady=5, sticky='w')
+        rx_entry.grid(row=2, column=0, padx=10, pady=5, sticky='n')
+        rx_entry.bind('<Return>',
+                      lambda event: self.rename_and_move_with_rx_number(rx_entry.get(), rx_entry))  # Add this line
 
-        button=ctk.CTkButton(self.buttons_frame, text="Submit",
-                             command=lambda: self.rename_and_move_with_rx_number(rx_entry.get(), rx_entry))
-        button.grid(row=2, column=0, padx=10, pady=5, sticky='w')
+        # Add hover effect to the Submit button
+        submit_button=tk.Button(self.buttons_frame, text="Submit", bg="lightblue", fg="black", relief="raised",
+                                font=('Arial', 12),
+                                command=lambda: self.rename_and_move_with_rx_number(rx_entry.get(), rx_entry))
+        submit_button.grid(row=3, column=0, padx=10, pady=5, sticky='n')
+        submit_button.bind('<Enter>', lambda event: self.on_enter(submit_button))
+        submit_button.bind('<Leave>', lambda event: self.on_leave(submit_button))
 
-        self.view_rx_button=ctk.CTkButton(self.buttons_frame, text='   View RX   ', command=self.view_rx,
-                                          state='disabled', height=25, width=60)
-        self.view_rx_button.grid(row=3, column=0, padx=10, pady=10, sticky='w')
-        self.buttons_frame.config(borderwidth=0)
+        self.view_rx_button=tk.Button(self.buttons_frame, text='   View RX   ', command=self.view_rx, state='disabled',
+                                      height=3, width=15, bg="lightblue", fg="black", relief="raised",
+                                      font=('Arial', 12))
+        self.view_rx_button.grid(row=4, column=0, padx=10, pady=10, sticky='n')
+        self.view_rx_button.bind('<Enter>', lambda event: self.on_enter(self.view_rx_button))
+        self.view_rx_button.bind('<Leave>', lambda event: self.on_leave(self.view_rx_button))
 
-        self.split_scripts_button=ctk.CTkButton(self.buttons_frame, text='Split Scripts', command=self.split_scripts,
-                                                height=25, width=60)
-        self.split_scripts_button.grid(row=4, column=0, padx=10, pady=10, sticky='w')
+        self.split_scripts_button=tk.Button(self.buttons_frame, text='Split Scripts', command=self.split_scripts,
+                                            height=3, width=15, bg="lightblue", fg="black", relief="raised",
+                                            font=('Arial', 12))
+        self.split_scripts_button.grid(row=5, column=0, padx=10, pady=10, sticky='n')
+        self.split_scripts_button.bind('<Enter>', lambda event: self.on_enter(self.split_scripts_button))
+        self.split_scripts_button.bind('<Leave>', lambda event: self.on_leave(self.split_scripts_button))
 
-        self.rename_button=ctk.CTkButton(self.buttons_frame, text='NOT a RX\nRename and Move',
-                                         command=self.rename, height=25, width=60)
-        self.rename_button.grid(row=5, column=0, padx=10, pady=10, sticky='w')
+        # Add this line to properly create the rename_button
+        self.rename_button=tk.Button(self.buttons_frame, text='NOT a RX\nRename and Move',
+                                     command=self.rename, height=3, width=15, bg="lightblue", fg="black",
+                                     relief="raised", font=('Arial', 12))
 
-        self.properties_button=ctk.CTkButton(self.buttons_frame, text='NOT a RX\n Move',
-                                             command=self.properties, height=25, width=60)
-        self.properties_button.grid(row=6, column=0, padx=10, pady=10, sticky='w')
+        self.rename_button.grid(row=6, column=0, padx=10, pady=10, sticky='n')
+        self.rename_button.bind('<Enter>', lambda event: self.on_enter(self.rename_button))
+        self.rename_button.bind('<Leave>', lambda event: self.on_leave(self.rename_button))
 
-        self.refresh_lists_button=ctk.CTkButton(self.buttons_frame, text='Refresh Lists', command=self.refresh_lists,
-                                                height=25, width=60)
-        self.refresh_lists_button.grid(row=7, column=0, padx=10, pady=10, sticky='w')
+        self.properties_button = tk.Button(self.buttons_frame, text='NOT a RX\nMove',
+                                   command=self.properties, height=3, width=15, bg="lightblue", fg="black",
+                                   relief="raised", font=('Arial', 12))
+        self.properties_button.grid(row=7, column=0, padx=10, pady=10, sticky='n')
+        self.properties_button.bind('<Enter>', lambda event: self.on_enter(self.properties_button))
+        self.properties_button.bind('<Leave>', lambda event: self.on_leave(self.properties_button))
 
-        self.theme_button=ctk.CTkButton(self.master, text='Themes', command=self.switch_theme, height=25,
-                                        width=60)
-        self.theme_button.grid(row=8, column=0, padx=10, pady=40, sticky='nw')
+
+        self.refresh_lists_button = tk.Button(self.buttons_frame, text='Refresh Lists', command=self.refresh_lists,
+                                      height=3, width=15, bg="lightblue", fg="black", relief="raised",
+                                      font=('Arial', 12))
+        self.refresh_lists_button.grid(row=8, column=0, padx=10, pady=10, sticky='n')
+        self.refresh_lists_button.bind('<Enter>', lambda event: self.on_enter(self.refresh_lists_button))
+        self.refresh_lists_button.bind('<Leave>', lambda event: self.on_leave(self.refresh_lists_button))
+
 
         self.tree.bind('<<TreeviewSelect>>', self.on_treeview_select)
         self.tree.bind('<Double-Button-1>', self.on_double_click)
 
-        self.open_files={}  # Initialize as a dictionary
-
-        # Call update_file_list to populate the Treeview
-        self.update_file_list()
-
-        # Set initial theme
-        self.set_theme()
+        self.open_files = {}  # Initialize as a dictionary
 
         # Add the preview back in
         self.preview_frame = ttk.Frame(self.master, width=600, height=800)
@@ -156,9 +171,17 @@ class Explorer:
         self.pages_label = ttk.Label(self.master, text="Pages:")
         self.pages_label.grid(row=1, column=3, padx=20, pady=15, sticky="nw")
 
-        self.admin_button = ctk.CTkButton(self.master, text='Admin', command=self.open_admin, height=25, width=60)
-        self.admin_button.grid(row=6, column=0, padx=10, pady=10, sticky='nw')
+        self.admin_button = tk.Button(self.master, text='Admin', command=self.open_admin, height=1, width=8, bg="lightblue",
+                              fg="black", relief="raised", font=('Arial', 12))
+        self.admin_button.grid(row=1, column=0, padx=10, pady=20, sticky='nw')
+        self.admin_button.bind('<Enter>', lambda event: self.on_enter(self.admin_button))
+        self.admin_button.bind('<Leave>', lambda event: self.on_leave(self.admin_button))
 
+        self.theme_button = tk.Button(self.master, text='Themes', command=self.switch_theme, height=1, width=8, bg="lightblue",
+                              fg="black", relief="raised", font=('Arial', 12))
+        self.theme_button.grid(row=1, column=0, padx=10, pady=80, sticky='nw')
+        self.theme_button.bind('<Enter>', lambda event: self.on_enter(self.theme_button))
+        self.theme_button.bind('<Leave>', lambda event: self.on_leave(self.theme_button))
 
         self.open_files = {}  # Initialize as a dictionary
 
@@ -167,6 +190,14 @@ class Explorer:
 
         # Set initial theme
         self.set_theme()
+
+
+
+    def on_enter(self, button):
+        button['background']='#5CA5CC'
+
+    def on_leave(self, button):
+        button['background']='lightblue'
 
     def set_theme(self):
         """Configure theme colors for UI elements."""
@@ -240,39 +271,46 @@ class Explorer:
         # Enable the preview canvas after the preview has been updated
         self.preview_canvas.configure(state='normal')
 
-
     def update_preview(self, filepath):
-        """Update the preview of the selected file."""
-        print(f"Updating preview for {filepath}")
+        self.preview_canvas.delete("all")
+        self.pages_label.config(text="")
 
-        if os.path.isfile(filepath):
-            _, file_extension=os.path.splitext(filepath)
+        if filepath is not None:
+            try:
+                # Check if the file is an image or a PDF
+                if filepath.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.pdf')):
+                    img=None
+                    page_count=0
 
-            if file_extension.lower() in ['.jpg', '.jpeg']:
-                self.show_image_preview(filepath)
-                self.pages_label.config(text="Pages:")
-            elif file_extension.lower() == '.pdf':
-                try:
-                    images=pdf2image.convert_from_path(filepath, dpi=200, first_page=1, last_page=1)
-                    if images:
-                        img=images[0]
-                        img_io=BytesIO()
-                        img.save(img_io, 'PNG')
-                        img_io.seek(0)
-                        img=Image.open(img_io)
-                        self.show_image_preview(img)
-                        with open(filepath, "rb") as f:
-                            pdf=PdfReader(f)
-                            self.pages_label.config(text=f"Pages: {len(pdf.pages)}")
-                except Exception as e:
-                    print(f"Error updating PDF preview: {e}")
-                    self.show_image_preview(None)
-                    self.pages_label.config(text="")
-            else:
-                self.show_image_preview(None)
+                    # If the file is an image, open it using the Image module
+                    if filepath.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico')):
+                        img=Image.open(filepath)
+
+                    # If the file is a PDF, convert its first page to an image using fitz
+                    elif filepath.lower().endswith('.pdf'):
+                        pdf_doc=fitz.open(filepath)
+                        page_count=pdf_doc.page_count
+
+                        if page_count > 0:
+                            pdf_page=pdf_doc.load_page(0)
+                            pix=pdf_page.get_pixmap(matrix=fitz.Matrix(1, 1))
+                            img=Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
+                    if img:
+                        imgtk=ImageTk.PhotoImage(img)
+                        self.preview_canvas.create_image(0, 0, image=imgtk, anchor="nw")
+                        self.preview_canvas.image=imgtk
+
+                    # Update the page count label for PDF files
+                    if page_count > 0:
+                        self.pages_label.config(text=f"Pages: {page_count}")
+
+            except Exception as e:
+                print("Error updating image preview:", e)
+                self.preview_canvas.delete("all")
                 self.pages_label.config(text="")
         else:
-            self.show_image_preview(None)
+            self.preview_canvas.delete("all")
             self.pages_label.config(text="")
 
     def update_file_list(self):
@@ -356,7 +394,7 @@ class Explorer:
                 json.dump(shared_state, file)
 
         # Schedule the next check after 1000 milliseconds (1 second)
-        self.master.after(1000, self.check_update_flag)
+        self.master.after(50, self.check_update_flag)
 
     def split_scripts(self):
         selected_item=self.tree.selection()[0]
@@ -490,6 +528,10 @@ class Explorer:
             return False
         return True
 
+    def search_rx(self):
+        script_path=os.path.join(os.path.dirname(__file__), 'search.py')
+        subprocess.Popen(["python", script_path])
+
     def rename(self):
         def submit_rename():
             new_file_name=entry.get().strip()
@@ -504,15 +546,20 @@ class Explorer:
                                      parent=rename_popup)
                 return
 
+            # Get the file extension
+            file_extension=os.path.splitext(file_name)[1]
+
+            # Add the timestamp to the new file name
+            timestamp=datetime.datetime.now().strftime("%y%m%d%H%M%S")
+            new_file_name=f"{new_file_name}_{timestamp}{file_extension}"
+
             destination_path=os.path.join(destination_folder_2, new_file_name)
 
             if os.path.exists(destination_path):
-                date_time_suffix=datetime.datetime.now().strftime("%y%m%d%H%M%S")
-                new_file_name+=f"_{date_time_suffix}"
-                destination_path=os.path.join(destination_folder_2, new_file_name)
-                messagebox.showinfo("File name conflict",
-                                    f"File with the same name exists. Appending date and time to the file name: {new_file_name}",
-                                    parent=rename_popup)
+                messagebox.showerror("File name conflict",
+                                     f"File with the same name exists in \"{destination_folder_2}\". Please rename the file before moving.",
+                                     parent=rename_popup)
+                return
 
             next_item=self.tree.next(selected_item)
 
@@ -556,6 +603,8 @@ class Explorer:
         entry=tk.Entry(rename_popup)
         entry.pack(padx=10, pady=10)
 
+        entry.focus_set()
+
         button_frame=tk.Frame(rename_popup)
         button_frame.pack(pady=10)
 
@@ -565,23 +614,100 @@ class Explorer:
         cancel_button=tk.Button(button_frame, text="Cancel", command=cancel_rename)
         cancel_button.pack(side="right", padx=5)
 
+    def rename_and_move_with_rx_number(self, rx_number, rx_entry=None):
+        selected_item=self.tree.selection()[0]
+        file_name=self.tree.item(selected_item, 'text')
+        source_path=os.path.join(self.incoming_folder, file_name)
+
+        if not rx_number:
+            messagebox.showwarning("Warning", "No file name entered.")
+            return
+
+        if not rx_number.isdigit():
+            messagebox.showerror("Error", "Invalid input. RX number should only contain digits.")
+            return
+
+        try:
+            with open('variables.json') as config_file:
+                config=json.load(config_file)
+
+            self.script_length=int(config["script_length"])
+            self.destination_folder_1=config["destination_folder_1"]
+
+            original_file_path=source_path
+            _, file_extension=os.path.splitext(original_file_path)
+
+            if self.script_length != 0:
+                if len(rx_number) > self.script_length:
+                    messagebox.showerror("Error", "Script number too long.")
+                    return
+                elif len(rx_number) < self.script_length:
+                    result=messagebox.askokcancel("Warning",
+                                                  f"Not correct RX number length. Adding leading zeros: {rx_number.zfill(self.script_length)}")
+                    if not result:
+                        return
+                    rx_number=rx_number.zfill(self.script_length)
+
+            padded_rx_number=rx_number
+            timestamp=datetime.datetime.now().strftime("_%y%m%d%H%M%S")
+            new_file_name=f"{padded_rx_number}{timestamp}{file_extension}"
+            new_file_path=os.path.join(self.destination_folder_1, new_file_name)
+
+            shutil.move(original_file_path, new_file_path)
+
+            messagebox.showinfo("Success", "The original file has been renamed and moved.")
+            rx_entry.delete(0, 'end')  # Add this line to clear the entry field
+
+            self.refresh_lists()
+
+            # Refresh the view for the next file
+            incoming_folder=config["incoming_folder"]
+            folder_contents=os.listdir(incoming_folder)
+            with open('showlist.json', 'w') as showlist_file:
+                json.dump(folder_contents, showlist_file)
+
+            with open('showlist.json', 'r') as showlist_file:
+                showlist=json.load(showlist_file)
+
+            if showlist:
+                next_file_path=os.path.join(incoming_folder, showlist[0])
+            else:
+                print("No more files to display")
+                response=messagebox.showwarning("No Files", "There are no more files to display.")
+                if response == 'ok':
+                    sys.exit()
+
+        except Exception as e:
+            messagebox.showerror("Rename and Move Error",
+                                 f"An error occurred while renaming and moving the document: {e}")
+
     def properties(self):
         def submit_move():
-            destination_path=os.path.join(destination_folder_2, file_name)
+            # Get the file extension
+            file_extension=os.path.splitext(file_name)[1]
 
-            if os.path.exists(destination_path):
+            # Add the timestamp to the file name
+            timestamp=datetime.datetime.now().strftime("%y%m%d%H%M%S")
+            new_file_name=f"{file_name}_{timestamp}{file_extension}"
+
+            # Create the new file path with the updated file name
+            new_file_path=os.path.join(destination_folder_2, new_file_name)
+
+            if os.path.exists(new_file_path):
                 messagebox.showerror("File name conflict",
                                      f"File with the same name exists in \"{destination_folder_2}\". Please rename the file before moving.",
                                      parent=properties_popup)
                 return
 
             next_item=self.tree.next(selected_item)
-            shutil.move(source_path, destination_path)
+            shutil.move(source_path, new_file_path)  # Update the source path to use the new file path
             properties_popup.destroy()
             self.refresh_lists()
 
             # Show temporary message after moving the file
-            self.show_message_auto_close("File moved", f'"{file_name}" moved to "{destination_folder_2}"', 2000)
+            self.show_message_auto_close("File moved",
+                                         f'"{file_name}" moved to "{destination_folder_2}" and renamed to "{new_file_name}"',
+                                         2000)
 
         def cancel_move():
             properties_popup.destroy()
